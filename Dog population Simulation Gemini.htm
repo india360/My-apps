@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IndiePop v3: Lifetime Limits</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            /* Theme: Indian Street Dog (Earthy Oranges, Greys, Whites) */
+            --primary: #D35400; /* Burnt Orange */
+            --primary-hover: #E67E22;
+            --secondary: #27AE60; /* Green */
+            --retired: #7F8C8D;   /* Grey for retired females */
+            --dark: #2C3E50;
+            --light: #ECF0F1;
+            --white: #ffffff;
+            --bg-sidebar: #f8f9fa;
+            --shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Inter, system-ui, sans-serif;
+            background-color: var(--light);
+            color: var(--dark);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Layout */
+        .container { display: flex; flex: 1; overflow: hidden; }
+
+        /* Sidebar Styling */
+        aside {
+            width: 350px;
+            background-color: var(--white);
+            border-right: 1px solid #ddd;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+
+        h1 { font-size: 1.5rem; color: var(--primary); margin-bottom: 5px; font-weight: 700; }
+        .subtitle { font-size: 0.85rem; color: var(--retired); margin-bottom: 25px; }
+
+        .control-group { margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
+        .control-group:last-of-type { border-bottom: none; }
+
+        label { display: block; font-size: 0.9rem; font-weight: 600; margin-bottom: 5px; color: var(--dark); }
+        .helper-text { font-size: 0.75rem; color: var(--retired); margin-bottom: 5px; }
+
+        input[type="number"] {
+            width: 100%; padding: 8px; border: 1px solid #ddd;
+            border-radius: 4px; font-family: inherit; transition: border 0.2s;
+        }
+        input[type="number"]:focus { border-color: var(--primary); outline: none; }
+
+        .btn-run {
+            margin-top: 10px; background-color: var(--primary); color: white;
+            border: none; padding: 12px; border-radius: 6px; font-weight: 600;
+            cursor: pointer; transition: background 0.2s, transform 0.1s; width: 100%; font-size: 1rem;
+        }
+        .btn-run:hover { background-color: var(--primary-hover); }
+
+        /* Main Content Area */
+        main { flex: 1; padding: 30px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+
+        /* Cards */
+        .card { background: var(--white); border-radius: 8px; padding: 20px; box-shadow: var(--shadow); }
+        .chart-container { position: relative; height: 400px; width: 100%; }
+
+        /* Table Styling */
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
+        th { background-color: var(--bg-sidebar); padding: 10px; font-weight: 600; border-bottom: 2px solid #eee; white-space: nowrap; }
+        td { padding: 8px 10px; border-bottom: 1px solid #eee; }
+        tr:hover { background-color: #f9f9f9; }
+        .stat-highlight { color: var(--primary); font-weight: 700; }
+        
+        @media (max-width: 768px) {
+            .container { flex-direction: column; overflow: auto; }
+            aside { width: 100%; border-right: none; border-bottom: 1px solid #ddd; }
+            body { height: auto; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <aside>
+        <h1>IndiePop v3</h1>
+        <p class="subtitle">Lifetime Reproduction Limits</p>
+
+        <div class="control-group">
+            <label>Starting Adult Population</label>
+            <div style="display: flex; gap: 10px;">
+                <div><span class="helper-text">Females</span><input type="number" id="startFemales" value="20" min="0"></div>
+                <div><span class="helper-text">Males</span><input type="number" id="startMales" value="20" min="0"></div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label for="breedingAge">Breeding Start Age (Years)</label>
+            <p class="helper-text">Wait time before 1st litter</p>
+            <input type="number" id="breedingAge" value="1" min="1" max="5">
+        </div>
+
+        <div class="control-group" style="background: #fff8f0; padding: 10px; border-radius: 6px; border: 1px solid #ffccaa;">
+            <label for="maxLitters">Max Litters per Lifetime</label>
+            <p class="helper-text">Females retire (stop breeding) after this many litters.</p>
+            <input type="number" id="maxLitters" value="5" min="1" max="15">
+        </div>
+
+        <div class="control-group">
+            <label>Reproduction Rates</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div><p class="helper-text">Litters/Year</p><input type="number" id="littersPerYear" value="1.0" step="0.1" min="0"></div>
+                <div><p class="helper-text">Pups/Litter</p><input type="number" id="litterSize" value="5" min="1"></div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label for="puppySurvival">Puppy Survival Rate (%)</label>
+            <input type="number" id="puppySurvival" value="25" min="0" max="100">
+        </div>
+
+        <div class="control-group">
+            <label for="adultMortality">Adult Mortality Rate (%)</label>
+            <input type="number" id="adultMortality" value="15" min="0" max="100">
+        </div>
+
+        <div class="control-group">
+            <label for="carryingCapacity">Carrying Capacity</label>
+            <input type="number" id="carryingCapacity" value="500" min="1">
+        </div>
+
+        <div class="control-group">
+            <label for="duration">Duration (Years)</label>
+            <input type="number" id="duration" value="15" min="1" max="50">
+        </div>
+
+        <button class="btn-run" onclick="runSimulation()">Run Simulation</button>
+    </aside>
+
+    <main>
+        <div class="card">
+            <div class="chart-container">
+                <canvas id="popChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Yearly Breakdown</h3>
+            <div class="table-container">
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th>Year</th>
+                            <th>Active Breeders</th>
+                            <th>Retired Females</th>
+                            <th>Immature</th>
+                            <th>New Pups</th>
+                            <th>Deaths</th>
+                            <th>Total Pop</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    let myChart = null;
+    document.addEventListener('DOMContentLoaded', runSimulation);
+
+    function runSimulation() {
+        // 1. Gather Inputs
+        const startFemales = parseInt(document.getElementById('startFemales').value);
+        const startMales = parseInt(document.getElementById('startMales').value);
+        const breedingAge = parseInt(document.getElementById('breedingAge').value);
+        const maxLitters = parseInt(document.getElementById('maxLitters').value); // New Input
+        const littersPerYear = parseFloat(document.getElementById('littersPerYear').value);
+        const litterSize = parseFloat(document.getElementById('litterSize').value);
+        const puppySurvivalRate = parseFloat(document.getElementById('puppySurvival').value) / 100;
+        const adultMortalityRate = parseFloat(document.getElementById('adultMortality').value) / 100;
+        const carryingCapacity = parseInt(document.getElementById('carryingCapacity').value);
+        const duration = parseInt(document.getElementById('duration').value);
+
+        // 2. Initialize Variables
+        // Females Array: Index = Number of litters they have had.
+        // femalesByLitterCount[0] = Has had 0 litters.
+        // femalesByLitterCount[maxLitters] = RETIRED (Has reached limit).
+        let femalesByLitterCount = new Array(maxLitters + 1).fill(0);
+        
+        // Start assumes all initial females are "fresh" (0 litters) - simplest assumption
+        femalesByLitterCount[0] = startFemales;
+
+        let males = startMales;
+        let juvenileQueue = new Array(Math.max(0, breedingAge - 1)).fill(0);
+        
+        // Initial Totals
+        let activeBreeders = startFemales; 
+        let retiredFemales = 0;
+        let totalFemales = startFemales;
+        let currentTotal = totalFemales + males;
+
+        // Chart Data
+        const labels = Array.from({length: duration + 1}, (_, i) => `Year ${i}`);
+        const dataTotal = [currentTotal];
+        const dataActive = [activeBreeders];
+        const dataRetired = [0];
+
+        // Table Reset
+        const tableBody = document.querySelector('#dataTable tbody');
+        tableBody.innerHTML = '';
+        addTableRow(0, activeBreeders, 0, 0, 0, 0, currentTotal);
+
+        // 3. Simulation Loop
+        for (let year = 1; year <= duration; year++) {
+            
+            // --- A. Identify Breeding Pool ---
+            // Sum all females who have NOT reached maxLitters
+            let breedingPool = 0;
+            for(let i=0; i < maxLitters; i++) {
+                breedingPool += femalesByLitterCount[i];
+            }
+            retiredFemales = femalesByLitterCount[maxLitters];
+
+            // --- B. Reproduction ---
+            let potentialGrossPuppies = breedingPool * littersPerYear * litterSize;
+            let potentialSurvivors = potentialGrossPuppies * puppySurvivalRate;
+
+            // Carrying Capacity Limit
+            let capacityFactor = (carryingCapacity - currentTotal) / carryingCapacity;
+            if (capacityFactor < 0) capacityFactor = 0;
+            let actualNewSurvivors = Math.floor(potentialSurvivors * capacityFactor);
+
+            let newFemales = Math.floor(actualNewSurvivors / 2);
+            let newMales = actualNewSurvivors - newFemales;
+
+            // --- C. Advancement of Litters (The Aging Logic) ---
+            // If littersPerYear is 1, every female moves up 1 slot in the array.
+            // If littersPerYear is 0.5 (one litter every 2 years), only half move up.
+            // For simplicity in this discrete model, we assume the WHOLE breeding pool moves up 
+            // proportional to littersPerYear. If LittersPerYear >= 1, we shift everyone.
+            
+            // We create a temporary next-year array to handle the shifts
+            let nextYearFemales = new Array(maxLitters + 1).fill(0);
+            
+            // 1. Handle Retired Females first (they stay retired until death)
+            nextYearFemales[maxLitters] = retiredFemales;
+
+            // 2. Shift Breeders
+            // We iterate backwards to avoid overwriting
+            for (let i = 0; i < maxLitters; i++) {
+                let count = femalesByLitterCount[i];
+                if(count > 0) {
+                    // Logic: If LittersPerYear is 1, everyone at [i] goes to [i+1].
+                    // If LittersPerYear is < 1 (e.g. 0.5), 50% stay at [i], 50% move to [i+1].
+                    // If LittersPerYear > 1 (e.g. 1.2), everyone moves at least 1, some move 2 (simplified to just moving 1 slot per year for discrete stability, or we assume multiple births count toward "Max Litters" cap).
+                    
+                    // We will simplify: If you breed this year, you move up 1 slot.
+                    // Probability of breeding this year = LittersPerYear (capped at 1 for this probability logic).
+                    let probabilityOfBreeding = Math.min(1, littersPerYear);
+                    
+                    let movingUp = Math.floor(count * probabilityOfBreeding);
+                    let stayingPut = count - movingUp;
+                    
+                    // Those staying put remain at current litter count
+                    nextYearFemales[i] += stayingPut;
+                    
+                    // Those moving up go to next slot (or cap at max)
+                    let nextSlot = Math.min(maxLitters, i + 1);
+                    nextYearFemales[nextSlot] += movingUp;
+                }
+            }
+            femalesByLitterCount = nextYearFemales;
+
+
+            // --- D. Mortality ---
+            let totalDeaths = 0;
+            
+            // 1. Male Mortality
+            let mDeaths = Math.floor(males * adultMortalityRate);
+            males = Math.max(0, males - mDeaths);
+            totalDeaths += mDeaths;
+
+            // 2. Female Mortality (Apply to every slot in the array)
+            for(let i=0; i <= maxLitters; i++) {
+                let fDeaths = Math.floor(femalesByLitterCount[i] * adultMortalityRate);
+                femalesByLitterCount[i] = Math.max(0, femalesByLitterCount[i] - fDeaths);
+                totalDeaths += fDeaths;
+            }
+
+            // 3. Juvenile Mortality
+            juvenileQueue = juvenileQueue.map(c => {
+                let d = Math.floor(c * adultMortalityRate);
+                totalDeaths += d;
+                return Math.max(0, c - d);
+            });
+
+            // --- E. Maturation (Incoming Fresh Females) ---
+            males += newMales; // Males just join the pool
+
+            if (breedingAge === 1) {
+                // Join immediately at 0 litters
+                femalesByLitterCount[0] += newFemales;
+            } else {
+                let matured = juvenileQueue.shift() || 0;
+                femalesByLitterCount[0] += matured;
+                juvenileQueue.push(newFemales);
+            }
+
+            // --- F. Recalculate Totals ---
+            activeBreeders = 0;
+            for(let i=0; i < maxLitters; i++) activeBreeders += femalesByLitterCount[i];
+            retiredFemales = femalesByLitterCount[maxLitters];
+            
+            let immature = juvenileQueue.reduce((a,b)=>a+b, 0);
+            currentTotal = activeBreeders + retiredFemales + males + immature;
+
+            dataTotal.push(currentTotal);
+            dataActive.push(activeBreeders);
+            dataRetired.push(retiredFemales);
+
+            addTableRow(year, activeBreeders, retiredFemales, immature, actualNewSurvivors, totalDeaths, currentTotal);
+        }
+
+        updateChart(labels, dataTotal, dataActive, dataRetired, carryingCapacity);
+    }
+
+    function addTableRow(year, active, retired, immature, newSurvivors, deaths, total) {
+        const tbody = document.querySelector('#dataTable tbody');
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${year}</td>
+            <td>${active}</td>
+            <td style="color:#7F8C8D">${retired}</td>
+            <td style="color:#95A5A6">${immature}</td>
+            <td><span style="color:#27AE60; font-weight:bold">+${newSurvivors}</span></td>
+            <td><span style="color:#C0392B">-${deaths}</span></td>
+            <td class="stat-highlight">${total}</td>
+        `;
+        tbody.appendChild(row);
+    }
+
+    function updateChart(labels, total, active, retired, capacity) {
+        const ctx = document.getElementById('popChart').getContext('2d');
+        if (myChart) myChart.destroy();
+
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Total Dogs',
+                        data: total,
+                        borderColor: '#D35400',
+                        backgroundColor: 'rgba(211, 84, 0, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.3,
+                        fill: true
+                    },
+                    {
+                        label: 'Active Breeders',
+                        data: active,
+                        borderColor: '#27AE60', /* Green */
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: false
+                    },
+                    {
+                        label: 'Retired Females',
+                        data: retired,
+                        borderColor: '#7F8C8D', /* Grey */
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        tension: 0.3,
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: 'Population & Reproductive Status', font: { size: 16 } },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    y: { beginAtZero: true },
+                    x: { title: { display: true, text: 'Years' } }
+                }
+            }
+        });
+    }
+</script>
+</body>
+</html>
